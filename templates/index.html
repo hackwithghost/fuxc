@@ -1,65 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <title>Webhook Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: system-ui, Arial, sans-serif;
-      background: #0f172a;
-      color: #e5e7eb;
-      padding: 20px;
-    }
-    .card {
-      background: #020617;
-      border-radius: 12px;
-      padding: 20px;
-      max-width: 900px;
-      margin: auto;
-      box-shadow: 0 20px 40px rgba(0,0,0,.4);
-    }
-    h1 {
-      margin-bottom: 10px;
-    }
-    .badge {
-      background: #22c55e;
-      color: black;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 14px;
-      display: inline-block;
-    }
-    pre {
-      background: #020617;
-      border: 1px solid #1e293b;
-      padding: 15px;
-      border-radius: 8px;
-      overflow-x: auto;
-    }
-    .muted {
-      color: #94a3b8;
-      font-size: 14px;
-    }
+    body { background:#0f172a; color:#e5e7eb; font-family:system-ui; padding:20px }
+    .card { background:#020617; padding:20px; border-radius:12px; max-width:900px; margin:auto }
+    pre { background:#020617; border:1px solid #1e293b; padding:10px; border-radius:8px }
+    a { color:#38bdf8 }
+    .time { color:#94a3b8; font-size:14px }
   </style>
 </head>
 <body>
 
 <div class="card">
   <h1>🚀 Webhook Receiver</h1>
-  <span class="badge">LIVE</span>
+  <p>Endpoint: <code>/webhook</code></p>
 
-  <p class="muted">
-    Endpoint: <code>/webhook</code>
-  </p>
+  {% for e in events %}
+    <hr>
+    <div class="time">{{ e.time }}</div>
 
-  {% if data %}
-    <h3>Last Webhook</h3>
-    <p class="muted">Received at: {{ data.time }}</p>
-    <pre>{{ data.payload | tojson(indent=2) }}</pre>
-  {% else %}
-    <p class="muted">No webhook received yet.</p>
-  {% endif %}
+    {% if e.file %}
+      📦 File received:
+      <a href="/download/{{ e.file }}">Download</a>
+    {% else %}
+      <pre>{{ e.payload | tojson(indent=2) }}</pre>
+    {% endif %}
+  {% endfor %}
 </div>
 
 </body>
