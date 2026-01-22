@@ -1,32 +1,33 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import datetime
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
 
-# Store last webhook (memory)
 last_webhook = {}
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "data": last_webhook
-        }
-    )
 
 @app.post("/webhook")
 async def receive_webhook(request: Request):
     global last_webhook
-    payload = await request.json()
+
+    content_type = request.headers.get("content-type", "")
+    payload = None
+
+    try:
+        if "application/json" in content_type:
+            payload = await request.json()
+        elif "application/x-www-form-urlencoded" in content_type:
+            payload = dict(await request.form())
+        else:
+            raw = await request.body()
+            payload = raw.decode("utf-8") if raw else None
+
+    except Exception as e:
+        payload = {"error": "Invalid payload", "details": str(e)}
 
     last_webhook = {
         "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "headers": dict(request.headers),
         "payload": payload
     }
 
