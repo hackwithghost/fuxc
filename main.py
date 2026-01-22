@@ -10,7 +10,8 @@ templates = Jinja2Templates(directory="templates")
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-events = []  # webhook history (memory)
+events = []  # keep last events in memory
+
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -22,17 +23,20 @@ async def home(request: Request):
         }
     )
 
+
 @app.post("/webhook")
-async def webhook(
+async def receive_webhook(
     request: Request,
     file: UploadFile = File(None)
 ):
     payload = None
-    filename = None
+    saved_file = None
 
-    # ---- Handle FILE upload ----
-    if file:
-        filename = f"{datetime.datetime.now().timestamp()}_{file.filename}"
+    # -----------------------------
+    # CASE 1: FILE UPLOAD
+    # -----------------------------
+    if file is not None:
+        filename = f"{int(datetime.datetime.now().timestamp())}_{file.filename}"
         filepath = os.path.join(UPLOAD_DIR, filename)
 
         with open(filepath, "wb") as f:
@@ -40,21 +44,33 @@ async def webhook(
 
         payload = {
             "type": "file",
-            "filename": file.filename
+            "original_name": file.filename,
+            "saved_as": filename
         }
+        saved_file = filename
 
-    # ---- Handle JSON / other payloads ----
+    # -----------------------------
+    # CASE 2: JSON or OTHER DATA
+    # -----------------------------
     else:
+        content_type = request.headers.get("content-type", "")
+
         try:
-            payload = await request.json()
-        except:
-            raw = await request.body()
-            payload = raw.decode(errors="ignore") if raw else None
+            if "application/json" in content_type:
+                payload = await request.json()
+            else:
+                raw = await request.body()
+                payload = raw.decode("utf-8", errors="ignore") if raw else None
+        except Exception as e:
+            payload = {
+                "error": "Could not parse payload",
+                "details": str(e)
+            }
 
     event = {
         "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "payload": payload,
-        "file": filename
+        "file": saved_file
     }
 
     events.insert(0, event)
@@ -64,7 +80,17 @@ async def webhook(
 
     return JSONResponse({"success": True})
 
+
 @app.get("/download/{filename}")
 async def download_file(filename: str):
     path = os.path.join(UPLOAD_DIR, filename)
     return FileResponse(path, filename=filename)
+
+
+@app.get("/webhook")
+async def webhook_info():
+    return {
+        "status": "Webhook endpoint active",
+        "methods": ["POST"],
+        "supports": ["JSON", "multipart file upload"]
+    }
