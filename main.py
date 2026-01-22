@@ -29,33 +29,35 @@ async def receive_webhook(
     payload = None
     saved_file = None
 
-    # ---------- FILE UPLOAD ----------
     if file is not None:
+        contents = await file.read()
+
+        if len(contents) > 5 * 1024 * 1024:
+            return JSONResponse(
+                {"error": "File too large (max 5MB)"},
+                status_code=413
+            )
+
         filename = f"{int(datetime.datetime.now().timestamp())}_{file.filename}"
         path = os.path.join(UPLOAD_DIR, filename)
 
         with open(path, "wb") as f:
-            f.write(await file.read())
+            f.write(contents)
 
         payload = {
             "type": "file",
             "original_name": file.filename,
-            "saved_as": filename
+            "size": len(contents)
         }
         saved_file = filename
 
-    # ---------- JSON / OTHER ----------
     else:
         content_type = request.headers.get("content-type", "")
-
-        try:
-            if "application/json" in content_type:
-                payload = await request.json()
-            else:
-                raw = await request.body()
-                payload = raw.decode("utf-8", errors="ignore") if raw else None
-        except Exception as e:
-            payload = {"error": str(e)}
+        if "application/json" in content_type:
+            payload = await request.json()
+        else:
+            raw = await request.body()
+            payload = raw.decode("utf-8", errors="ignore") if raw else None
 
     event = {
         "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -67,7 +69,6 @@ async def receive_webhook(
     events[:] = events[:20]
 
     print("📩 Webhook received:", event)
-
     return JSONResponse({"success": True})
 
 
@@ -78,7 +79,4 @@ async def download_file(filename: str):
 
 @app.get("/webhook")
 async def webhook_info():
-    return {
-        "status": "Webhook active",
-        "supports": ["JSON", "multipart/form-data"]
-    }
+    return {"status": "active"}
